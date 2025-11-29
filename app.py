@@ -9,6 +9,13 @@ from dotenv import load_dotenv
 # Load .env locally (Streamlit Cloud will inject env vars via Secrets)
 load_dotenv()
 
+# ---------- PAGE CONFIG (title + layout) ----------
+# This must be the FIRST Streamlit call in the script
+st.set_page_config(
+    page_title="Who's on shift?",
+    layout="wide",
+)
+
 # ----------------- CONFIG ----------------- #
 
 SITE_CONFIG = {
@@ -280,10 +287,6 @@ def apply_search_filter(
 
 
 def main():
-    st.set_page_config(
-        page_title="Who’s On Shift – MCs in Dublin 15 & Espoo", layout="wide"
-    )
-
     # Soft background + hide Streamlit chrome
     st.markdown(
         """
@@ -311,9 +314,7 @@ def main():
     # ----- Header ----- #
     top_left, top_right = st.columns([0.75, 0.25])
     with top_left:
-        st.markdown(
-            "## Who’s On Shift – MCs in IE Dublin 15 & FI Espoo",
-        )
+        st.markdown("## Who's on shift?")
         st.caption(
             f"Current time (UTC): {now_utc.strftime('%Y-%m-%d %H:%M:%S')}  |  Local zone label: {local_tz_label}"
         )
@@ -357,7 +358,15 @@ def main():
                 chosen = site_id
                 break
         if chosen:
-            all_sites = {chosen: all_sites.get(chosen, {"meta": ACTIVE_SITES[chosen], "roles": {"MC": [], "Pilot": [], "Other": []}})}
+            all_sites = {
+                chosen: all_sites.get(
+                    chosen,
+                    {
+                        "meta": ACTIVE_SITES[chosen],
+                        "roles": {"MC": [], "Pilot": [], "Other": []},
+                    },
+                )
+            }
 
     # Apply search filter
     all_sites = apply_search_filter(all_sites, search_text)
@@ -380,9 +389,7 @@ def main():
         pilot_count = len(roles["Pilot"])
         other_count = len(roles["Other"])
 
-        st.markdown(
-            f"### {flag} {label}",
-        )
+        st.markdown(f"### {flag} {label}")
         # Small summary badges
         col_mc, col_pilot, col_other = st.columns(3)
         with col_mc:
