@@ -285,22 +285,18 @@ def main():
     )
 
     # Soft background + hide Streamlit chrome
-    st.markdown(   
+    st.markdown(    
         """
         <style>
-        .title-bar {
-        background-color: #e0e7ff;  /* soft indigo */
-        padding: 1.2rem 2rem;
-        border-radius: 0.75rem;
-        margin-bottom: 1rem;
-        border: 1px solid #c7d2fe;
-        }
-        .title-bar h1 {
-        color: #1e3a8a !important;  /* dark indigo text */
+        .title-underline {
+        font-size: 2rem;
         font-weight: 700;
-        margin: 0;
+        border-bottom: 3px solid #6366f1; /* indigo */
+        padding-bottom: 0.4rem;
+        margin-bottom: 1rem;
         }
         </style>
+        <div class="title-underline">Who’s on shift?</div>
         """,
     unsafe_allow_html=True,
     )
@@ -318,7 +314,6 @@ def main():
     )
 
     # ----- Header ----- #
-    st.markdown("# Who's on shift?")
     st.caption(
         f"Current time (UTC): {now_utc.strftime('%Y-%m-%d %H:%M:%S')}  |  Local zone label: {local_tz_label}"
     )
