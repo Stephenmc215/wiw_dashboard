@@ -1,107 +1,31 @@
 import os
 from datetime import datetime, timezone
-from typing import List, Dict
+from typing import Dict, List
 
 import requests
 import streamlit as st
 from dotenv import load_dotenv
 
-# ---------------------------------------------------------------------
-# CONFIG
-# ---------------------------------------------------------------------
-
+# Load .env locally (Streamlit Cloud will inject env vars via Secrets)
 load_dotenv()
 
-# Two site-specific ICS feeds
-ICS_URL_DUBLIN15 = os.getenv("WIW_ICS_URL_DUBLIN15")
-ICS_URL_ESPOO = os.getenv("WIW_ICS_URL_ESPOO")
+# ----------------- CONFIG ----------------- #
 
-# If in future you add more sites, you can optionally put their ICS URLs
-# here as a comma-separated list in .env: WIW_EXTRA_ICS_URLS="url1,url2"
-EXTRA_ICS_URLS = [
-    u.strip()
-    for u in os.getenv("WIW_EXTRA_ICS_URLS", "").split(",")
-    if u.strip()
-]
-
-# Combine all configured ICS URLs
-ICS_URLS = [u for u in [ICS_URL_DUBLIN15, ICS_URL_ESPOO] if u] + EXTRA_ICS_URLS
-
-# Local timezone label for display only (we still use UTC internally)
-LOCAL_TZ_LABEL = "Europe/Dublin"
-
-# If you ever want to limit which schedules are shown, you can set:
-# WIW_ALLOWED_SCHEDULES="Dublin 15 Operations Schedule,Espoo Operations Schedule"
-_allowed = os.getenv("WIW_ALLOWED_SCHEDULES")
-ALLOWED_SCHEDULES = (
-    {s.strip() for s in _allowed.split(",") if s.strip()} if _allowed else None
-)
-
-# Icons per schedule (others fall back to 📍)
-SCHEDULE_ICONS = {
-    "Dublin 15 Operations Schedule": "🇮🇪",
-    "Espoo Operations Schedule": "🇫🇮",
+SITE_CONFIG = {
+    "dublin15": {
+        "env_var": "WIW_ICS_URL_DUBLIN15",
+        "label": "IE Dublin 15",
+        "flag": "🇮🇪",
+    },
+    "espoo": {
+        "env_var": "WIW_ICS_URL_ESPOO",
+        "label": "FI Espoo",
+        "flag": "🇫🇮",
+    },
 }
 
-# ---------------------------------------------------------------------
-# STYLING
-# ---------------------------------------------------------------------
 
-
-def inject_css():
-    """Single soft background + simple cards, no dark mode."""
-    css = """
-    <style>
-    .stApp {
-        background-color: #f5f5f9;
-    }
-
-    .main .block-container {
-        padding-top: 1.5rem;
-        padding-bottom: 2rem;
-    }
-
-    .role-header {
-        font-weight: 600;
-        font-size: 0.85rem;
-        text-transform: uppercase;
-        letter-spacing: 0.06em;
-        margin-bottom: 0.35rem;
-        border-radius: 0.65rem;
-        padding: 0.45rem 0.9rem;
-    }
-
-    .person-card {
-        background-color: #ffffff;
-        border-radius: 0.6rem;
-        padding: 0.45rem 0.8rem;
-        margin-bottom: 0.35rem;
-        box-shadow: 0 1px 2px rgba(15, 23, 42, 0.06);
-        border: 1px solid #e5e7eb;
-        font-size: 0.95rem;
-    }
-
-    .status-pill {
-        display: inline-block;
-        margin-top: 0.2rem;
-        padding: 0.1rem 0.55rem;
-        border-radius: 999px;
-        font-size: 0.75rem;
-        font-weight: 500;
-    }
-
-    .muted-text {
-        color: #6b7280;
-        font-size: 0.9rem;
-    }
-    </style>
-    """
-    st.markdown(css, unsafe_allow_html=True)
-
-
-# ---------------------------------------------------------------------
-# ICS PARSING
-# ---------------------------------------------------------------------
+# ----------------- ICS PARSING ----------------- #
 
 
 def parse_ics_datetime(dt_str: str) -> datetime:
@@ -113,10 +37,10 @@ def parse_ics_datetime(dt_str: str) -> datetime:
 def parse_events_from_ics(ics_text: str) -> List[Dict]:
     """
     Read BEGIN:VEVENT ... END:VEVENT blocks and extract
-    DTSTART, DTEND, SUMMARY.
+    DTSTART, DTEND, SUMMARY, LOCATION.
     """
-    events = []
-    current = None
+    events: List[Dict] = []
+    current: Dict | None = None
 
     for raw_line in ics_text.splitlines():
         line = raw_line.strip()
@@ -134,49 +58,39 @@ def parse_events_from_ics(ics_text: str) -> List[Dict]:
                 current["end"] = parse_ics_datetime(line[len("DTEND:") :])
             elif line.startswith("SUMMARY:"):
                 current["summary"] = line[len("SUMMARY:") :]
+            elif line.startswith("LOCATION:"):
+                loc = line[len("LOCATION:") :]
+                current["location_raw"] = loc
 
     return events
 
 
-def parse_summary(summary: str):
+def extract_name_and_role(summary: str) -> Dict[str, str]:
     """
     SUMMARY example:
-      'Shauna Brady (Shift as Mission Control (MC) at MANNA HQ at Dublin 15 Operations Schedule)'
-
-    We want:
-      name     -> 'Shauna Brady'
-      role     -> 'Mission Control (MC)'
-      schedule -> 'Dublin 15 Operations Schedule'
-
-    If the pattern doesn't match cleanly, we just skip that event
-    (so you don't get an 'Unknown location' bucket).
+      'Stephen McSherry (Shift as Mission Control (MC) at MANNA HQ at Dublin 15 Operations Schedule)'
+    Returns: {"name": ..., "role": ...}
     """
-    if " (Shift as " not in summary:
-        return None
+    name = summary
+    role = "Unknown"
 
-    try:
+    if " (Shift as " in summary:
         name_part, rest = summary.split(" (Shift as ", 1)
-        rest = rest.rstrip(")")
-        parts = [p.strip() for p in rest.split(" at ")]
-        if len(parts) < 2:
-            return None
+        name = name_part.strip()
 
-        role = parts[0]
-        schedule = parts[-1]
+        if " at " in rest:
+            role_part, _ = rest.split(" at ", 1)
+        else:
+            role_part = rest.rstrip(")")
 
-        return {
-            "name": name_part.strip(),
-            "role": role,
-            "schedule": schedule,
-        }
-    except Exception:
-        return None
+        role = role_part.strip()
+
+    return {"name": name, "role": role}
 
 
 def classify_role(role: str) -> str:
     """
-    Put roles into buckets: MC, Pilot, Other.
-    (We still display the full role text beside the name.)
+    Put roles into buckets: MC, Pilot, Other (but keep real role text).
     """
     r = role.lower()
     if "mission control" in r or "(mc)" in r:
@@ -186,69 +100,68 @@ def classify_role(role: str) -> str:
     return "Other"
 
 
-# ---------------------------------------------------------------------
-# DATA FETCHING
-# ---------------------------------------------------------------------
+# ----------------- DATA FETCHING ----------------- #
+
+
+def load_active_sites() -> Dict[str, Dict]:
+    """Return only sites that have an ICS URL configured."""
+    active: Dict[str, Dict] = {}
+    for site_id, cfg in SITE_CONFIG.items():
+        url = os.getenv(cfg["env_var"])
+        if url:
+            active[site_id] = {**cfg, "url": url}
+    return active
+
+
+ACTIVE_SITES = load_active_sites()
 
 
 @st.cache_data(ttl=60)
-def fetch_ics(url: str) -> str:
-    resp = requests.get(url, timeout=10)
+def fetch_ics(site_id: str) -> str:
+    cfg = ACTIVE_SITES[site_id]
+    url = cfg["url"]
+    resp = requests.get(url, timeout=15)
     resp.raise_for_status()
     return resp.text
 
 
-def get_active_shifts(now_utc: datetime) -> Dict[str, Dict[str, List[Dict]]]:
+def get_active_shifts(now_utc: datetime) -> Dict[str, Dict]:
     """
+    Group active shifts by site and role.
+
     Returns:
     {
-      'Dublin 15 Operations Schedule': {'MC': [...], 'Pilot': [...], 'Other': [...]},
-      'Espoo Operations Schedule': {...},
+      "dublin15": {
+         "meta": {label, flag, ...},
+         "roles": {"MC": [...], "Pilot": [...], "Other": [...]}
+      },
       ...
     }
-    Only active shifts (now between start and end) are included in the lists.
-    Schedules with no current shifts still appear with empty lists.
     """
-    if not ICS_URLS:
-        raise RuntimeError(
-            "No ICS URLs configured. Set WIW_ICS_URL_DUBLIN15 / WIW_ICS_URL_ESPOO "
-            "in your .env file."
-        )
+    results: Dict[str, Dict] = {}
 
-    schedules: Dict[str, Dict[str, List[Dict]]] = {}
-
-    for url in ICS_URLS:
-        ics_text = fetch_ics(url)
+    for site_id, meta in ACTIVE_SITES.items():
+        ics_text = fetch_ics(site_id)
         events = parse_events_from_ics(ics_text)
+
+        roles: Dict[str, List[Dict]] = {"MC": [], "Pilot": [], "Other": []}
 
         for ev in events:
             start = ev.get("start")
             end = ev.get("end")
             summary = ev.get("summary", "")
+
             if not start or not end:
                 continue
 
-            info = parse_summary(summary)
-            if not info:
-                # Skip anything we can't cleanly parse to avoid 'Unknown' sites
-                continue
-
-            schedule_name = info["schedule"]
-
-            if ALLOWED_SCHEDULES and schedule_name not in ALLOWED_SCHEDULES:
-                continue
-
-            # Ensure schedule exists in dict even if nobody active
-            if schedule_name not in schedules:
-                schedules[schedule_name] = {"MC": [], "Pilot": [], "Other": []}
-
-            # Only active shifts
+            # Only keep shifts active right now (in UTC)
             if not (start <= now_utc <= end):
                 continue
 
+            info = extract_name_and_role(summary)
             bucket = classify_role(info["role"])
 
-            schedules[schedule_name][bucket].append(
+            roles[bucket].append(
                 {
                     "name": info["name"],
                     "role": info["role"],
@@ -257,209 +170,251 @@ def get_active_shifts(now_utc: datetime) -> Dict[str, Dict[str, List[Dict]]]:
                 }
             )
 
-    # Sort names in each bucket for neatness
-    for sched_data in schedules.values():
-        for key in ["MC", "Pilot", "Other"]:
-            sched_data[key].sort(key=lambda x: x["name"])
+        # Sort names for neatness
+        for key in roles:
+            roles[key].sort(key=lambda x: x["name"])
 
-    return schedules
+        results[site_id] = {"meta": meta, "roles": roles}
 
-
-# ---------------------------------------------------------------------
-# UI HELPERS
-# ---------------------------------------------------------------------
+    return results
 
 
-def prettify_schedule_name(schedule_name: str) -> str:
-    """Shorten 'Dublin 15 Operations Schedule' -> 'Dublin 15'."""
-    suffix = "Operations Schedule"
-    if schedule_name.endswith(suffix):
-        return schedule_name[: -len(suffix)].rstrip()
-    return schedule_name
+# ----------------- UI HELPERS ----------------- #
 
 
-def build_status_badge(end_dt: datetime, now_utc: datetime) -> str:
-    """Return HTML badge 'On until 21:30' etc."""
-    remaining = end_dt - now_utc
-    minutes = int(remaining.total_seconds() // 60)
-
-    end_time_str = end_dt.strftime("%H:%M")
-
-    if minutes <= 0:
-        emoji = "⚪"
-        bg = "#E5E7EB"
-        text = "Ending now"
-    elif minutes < 30:
-        emoji = "🔴"
-        bg = "#FEE2E2"
-        text = f"Ends in {minutes} min"
-    elif minutes < 120:
-        emoji = "🟡"
-        bg = "#FEF3C7"
-        text = f"On until {end_time_str}"
-    else:
-        emoji = "🟢"
-        bg = "#DCFCE7"
-        text = f"On until {end_time_str}"
-
-    return f'<span class="status-pill" style="background-color:{bg};">{emoji} {text}</span>'
+def format_end_time_local(end_utc: datetime) -> str:
+    """Return local time as HH:MM (24h)."""
+    local_dt = end_utc.astimezone()
+    return local_dt.strftime("%H:%M")
 
 
-def filter_people(people: List[Dict], query: str) -> List[Dict]:
-    q = (query or "").strip().lower()
-    if not q:
-        return people
-    return [
-        p
-        for p in people
-        if q in p["name"].lower() or q in p["role"].lower()
-    ]
+def render_person_card(person: Dict):
+    """Small white card for a single person."""
+    name = person["name"]
+    role = person["role"]
+    end_label = format_end_time_local(person["end"])
 
-
-def render_people_list(people: List[Dict], now_utc: datetime):
-    if not people:
-        st.markdown('<div class="muted-text"><em>None</em></div>', unsafe_allow_html=True)
-        return
-
-    for p in people:
-        badge_html = build_status_badge(p["end"], now_utc)
-        html = f"""
-        <div class="person-card">
-            <div>
-                <span style="font-weight:600;">{p['name']}</span>
-                <span style="color:#6b7280;">&nbsp;({p['role']})</span>
-            </div>
-            <div style="margin-top:0.1rem;">{badge_html}</div>
-        </div>
-        """
-        st.markdown(html, unsafe_allow_html=True)
-
-
-def render_role_column(
-    label: str,
-    people: List[Dict],
-    color: str,
-    now_utc: datetime,
-    expandable: bool = False,
-):
-    header_html = f"""
-    <div class="role-header" style="background-color:{color};">
-        {label}
+    card_html = f"""
+    <div style="
+        padding:0.55rem 0.8rem;
+        border-radius:0.6rem;
+        background-color:#ffffff;
+        margin-top:0.35rem;
+        box-shadow:0 0 0 1px #e5e7eb;
+    ">
+      <div style="font-weight:600; color:#111827;">{name}</div>
+      <div style="font-size:0.85rem; color:#4b5563; margin-top:0.1rem;">{role}</div>
+      <div style="font-size:0.8rem; color:#059669; margin-top:0.25rem;">
+        ● On until {end_label}
+      </div>
     </div>
     """
-    st.markdown(header_html, unsafe_allow_html=True)
+    st.markdown(card_html, unsafe_allow_html=True)
 
-    if expandable:
-        with st.expander(f"{label} ({len(people)})", expanded=False):
-            render_people_list(people, now_utc)
+
+def render_role_column(title: str, colour: str, people: List[Dict], is_other: bool = False):
+    """
+    Render MC / Pilot column, or an 'Other roles' expander.
+    colour = background colour of the header bar.
+    """
+    header_html = f"""
+    <div style="
+        padding:0.35rem 0.75rem;
+        border-radius:0.6rem;
+        background-color:{colour};
+        font-weight:600;
+        font-size:0.9rem;
+        color:#111827;
+        margin-bottom:0.3rem;
+    ">
+      {title}
+    </div>
+    """
+
+    if is_other:
+        # Make a single column with an expander
+        count = len(people)
+        with st.expander(f"Other roles ({count})", expanded=False):
+            st.markdown(header_html, unsafe_allow_html=True)
+            if not people:
+                st.caption("None on shift")
+            else:
+                for p in people:
+                    render_person_card(p)
     else:
-        render_people_list(people, now_utc)
+        st.markdown(header_html, unsafe_allow_html=True)
+        if not people:
+            st.caption("None on shift")
+        else:
+            for p in people:
+                render_person_card(p)
 
 
-# ---------------------------------------------------------------------
-# MAIN APP
-# ---------------------------------------------------------------------
+def apply_search_filter(
+    all_sites: Dict[str, Dict], search_text: str
+) -> Dict[str, Dict]:
+    """Filter people by name/role across all sites."""
+    if not search_text:
+        return all_sites
+
+    search = search_text.lower().strip()
+    filtered: Dict[str, Dict] = {}
+
+    for site_id, site_data in all_sites.items():
+        roles = site_data["roles"]
+        new_roles: Dict[str, List[Dict]] = {}
+        for bucket, people in roles.items():
+            new_roles[bucket] = [
+                p
+                for p in people
+                if search in p["name"].lower() or search in p["role"].lower()
+            ]
+        # Only keep site if at least one person matches
+        if any(new_roles[b] for b in new_roles):
+            filtered[site_id] = {"meta": site_data["meta"], "roles": new_roles}
+
+    return filtered
+
+
+# ----------------- MAIN APP ----------------- #
 
 
 def main():
     st.set_page_config(
-        page_title="Who’s On Shift – MCs in Dublin 15 & Espoo",
-        layout="wide",
+        page_title="Who’s On Shift – MCs in Dublin 15 & Espoo", layout="wide"
     )
 
-    inject_css()
+    # Soft background + hide Streamlit chrome
+    st.markdown(
+        """
+        <style>
+        .stApp {background-color: #f6f7fb;}
+        #MainMenu {visibility: hidden;}
+        footer {visibility: hidden;}
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
+
+    if not ACTIVE_SITES:
+        st.error(
+            "No ICS URLs configured. Set WIW_ICS_URL_DUBLIN15 / WIW_ICS_URL_ESPOO in your environment or Streamlit secrets."
+        )
+        return
 
     now_utc = datetime.now(timezone.utc)
-
-    # ----- VERY TOP TITLE (this is the one that appears under "Deploy") -----
-    st.title("Who’s On Shift – MCs in 🇮🇪 Dublin 15 & 🇫🇮 Espoo")
-    st.caption(
-        f"Current time (UTC): {now_utc.strftime('%Y-%m-%d %H:%M:%S')}  |  Local zone label: {LOCAL_TZ_LABEL}"
+    now_local = datetime.now().astimezone()
+    local_tz_label = (
+        getattr(now_local.tzinfo, "key", None) or now_local.tzname() or "Local time"
     )
 
-    # Controls row
-    controls_left, controls_right = st.columns([4, 1])
-    with controls_right:
-        if st.button("Refresh now"):
+    # ----- Header ----- #
+    top_left, top_right = st.columns([0.75, 0.25])
+    with top_left:
+        st.markdown(
+            "## Who’s On Shift – MCs in IE Dublin 15 & FI Espoo",
+        )
+        st.caption(
+            f"Current time (UTC): {now_utc.strftime('%Y-%m-%d %H:%M:%S')}  |  Local zone label: {local_tz_label}"
+        )
+
+    with top_right:
+        st.write("")  # vertical spacing
+        if st.button("Refresh now", use_container_width=True):
             st.cache_data.clear()
             st.rerun()
 
-    # Load data
+    st.markdown("---")
+
+    # ----- Controls ----- #
+    site_options = ["All locations"] + [
+        f"{cfg['flag']} {cfg['label']}" for cfg in ACTIVE_SITES.values()
+    ]
+    site_choice = st.selectbox("Select site", site_options, index=0)
+
+    search_text = st.text_input(
+        "Search by name or role",
+        placeholder="Type to filter (e.g. 'Darragh', 'MC', 'Flight Operator')",
+    )
+
     try:
-        schedules = get_active_shifts(now_utc)
+        all_sites = get_active_shifts(now_utc)
     except Exception as e:
         st.error(f"Error fetching or parsing schedule: {e}")
         return
 
-    if not schedules:
-        st.info("No schedules were found in the ICS feeds.")
+    if not all_sites:
+        st.info("No one is currently on shift according to the schedule.")
         return
 
-    schedule_names = sorted(schedules.keys())
+    # Filter by site selection
+    if site_choice != "All locations":
+        # Map choice back to site_id by matching label+flag
+        chosen = None
+        for site_id, cfg in ACTIVE_SITES.items():
+            label = f"{cfg['flag']} {cfg['label']}"
+            if label == site_choice:
+                chosen = site_id
+                break
+        if chosen:
+            all_sites = {chosen: all_sites.get(chosen, {"meta": ACTIVE_SITES[chosen], "roles": {"MC": [], "Pilot": [], "Other": []}})}
 
-    # ---- Filters ----
-    options = ["All locations"] + schedule_names
+    # Apply search filter
+    all_sites = apply_search_filter(all_sites, search_text)
 
-    def format_site(opt: str) -> str:
-        if opt == "All locations":
-            return "🌍 All locations"
-        icon = SCHEDULE_ICONS.get(opt, "📍")
-        pretty = prettify_schedule_name(opt)
-        return f"{icon} {pretty}"
+    if not all_sites:
+        st.info("No matching people on shift for that search / site selection.")
+        return
 
-    selected = st.selectbox("Select site", options, index=0, format_func=format_site)
+    st.markdown("")  # small spacing
 
-    search_query = st.text_input(
-        "Search by name or role",
-        "",
-        placeholder="Type to filter (e.g. 'Darragh', 'MC', 'Flight Operator')",
-    )
+    # ----- Per-site sections ----- #
+    for site_id, site_data in all_sites.items():
+        meta = site_data["meta"]
+        roles = site_data["roles"]
 
-    if selected == "All locations":
-        schedules_to_show = schedule_names
-    else:
-        schedules_to_show = [selected]
+        flag = meta["flag"]
+        label = meta["label"]
 
-    any_data = False
+        mc_count = len(roles["MC"])
+        pilot_count = len(roles["Pilot"])
+        other_count = len(roles["Other"])
 
-    for schedule_name in schedules_to_show:
-        st.markdown("---")
-        icon = SCHEDULE_ICONS.get(schedule_name, "📍")
-        pretty_name = prettify_schedule_name(schedule_name)
-        st.subheader(f"{icon} {pretty_name}")
-
-        sched_data = schedules.get(schedule_name, {"MC": [], "Pilot": [], "Other": []})
-
-        mc_list = filter_people(sched_data["MC"], search_query)
-        pilot_list = filter_people(sched_data["Pilot"], search_query)
-        other_list = filter_people(sched_data["Other"], search_query)
-
-        if mc_list or pilot_list or other_list:
-            any_data = True
-
-        # Summary chips
-        summary_html = f"""
-        <div style="display:flex; gap:0.5rem; font-size:0.85rem; margin-bottom:0.8rem; flex-wrap:wrap;">
-            <div style="background:#DCFCE7; padding:0.15rem 0.7rem; border-radius:999px;">🟢 MC: {len(mc_list)}</div>
-            <div style="background:#DBEAFE; padding:0.15rem 0.7rem; border-radius:999px;">🟦 Pilot: {len(pilot_list)}</div>
-            <div style="background:#E5E7EB; padding:0.15rem 0.7rem; border-radius:999px;">⚪ Other: {len(other_list)}</div>
-        </div>
-        """
-        st.markdown(summary_html, unsafe_allow_html=True)
-
-        col1, col2, col3 = st.columns(3)
-        with col1:
-            render_role_column("MC", mc_list, "#E8F5E9", now_utc)
-        with col2:
-            render_role_column("Pilot", pilot_list, "#E3F2FD", now_utc)
-        with col3:
-            render_role_column("Other roles", other_list, "#F5F5F5", now_utc, expandable=True)
-
-    if not any_data:
-        st.info(
-            "No one is currently on shift in the selected site(s), "
-            "based on the current When I Work schedules."
+        st.markdown(
+            f"### {flag} {label}",
         )
+        # Small summary badges
+        col_mc, col_pilot, col_other = st.columns(3)
+        with col_mc:
+            st.markdown(
+                f"<div style='font-size:0.8rem; color:#059669;'>● MC: {mc_count}</div>",
+                unsafe_allow_html=True,
+            )
+        with col_pilot:
+            st.markdown(
+                f"<div style='font-size:0.8rem; color:#2563eb;'>● Pilot: {pilot_count}</div>",
+                unsafe_allow_html=True,
+            )
+        with col_other:
+            st.markdown(
+                f"<div style='font-size:0.8rem; color:#6b21a8;'>● Other: {other_count}</div>",
+                unsafe_allow_html=True,
+            )
+
+        st.markdown("")  # spacing
+
+        col1, col2, col3 = st.columns([1, 1, 1.1])
+
+        with col1:
+            render_role_column("MC", "#e9f7ef", roles["MC"], is_other=False)
+
+        with col2:
+            render_role_column("PILOT", "#e5f0ff", roles["Pilot"], is_other=False)
+
+        with col3:
+            render_role_column("OTHER ROLES", "#f4e9ff", roles["Other"], is_other=True)
+
+        st.markdown("---")
 
 
 if __name__ == "__main__":
