@@ -9,24 +9,17 @@ from dotenv import load_dotenv
 # Load .env locally (Streamlit Cloud will inject env vars via Secrets)
 load_dotenv()
 
-# ---------- PAGE CONFIG (title + layout) ----------
-# This must be the FIRST Streamlit call in the script
-st.set_page_config(
-    page_title="Who's on shift?",
-    layout="wide",
-)
-
 # ----------------- CONFIG ----------------- #
 
 SITE_CONFIG = {
     "dublin15": {
         "env_var": "WIW_ICS_URL_DUBLIN15",
-        "label": "Dublin 15",
+        "label": "IE Dublin 15",
         "flag": "🇮🇪",
     },
     "espoo": {
         "env_var": "WIW_ICS_URL_ESPOO",
-        "label": "Espoo",
+        "label": "FI Espoo",
         "flag": "🇫🇮",
     },
 }
@@ -203,18 +196,16 @@ def render_person_card(person: Dict):
 
     card_html = f"""
     <div style="
-        padding:0.70rem 1.0rem;
+        padding:0.70rem 0.95rem;
         border-radius:0.75rem;
         background-color:#ffffff;
-        margin-top:0.45rem;
-        box-shadow:0 1px 2px rgba(15,23,42,0.04);
-        border:1px solid #e5e7eb;
+        margin-top:0.40rem;
+        box-shadow:0 0 0 1px #e5e7eb;
     ">
       <div style="font-weight:600; color:#111827; font-size:0.95rem;">{name}</div>
       <div style="font-size:0.85rem; color:#4b5563; margin-top:0.15rem;">{role}</div>
-      <div style="font-size:0.78rem; color:#6b7280; margin-top:0.35rem; display:flex; align-items:center; gap:0.30rem;">
-        <span style="display:inline-block; width:7px; height:7px; border-radius:999px; background-color:#10b981;"></span>
-        <span>On until {end_label}</span>
+      <div style="font-size:0.80rem; color:#047857; margin-top:0.35rem;">
+        <span style="font-size:0.7rem;">●</span> On until {end_label}
       </div>
     </div>
     """
@@ -228,13 +219,14 @@ def render_role_column(title: str, colour: str, people: List[Dict], is_other: bo
     """
     header_html = f"""
     <div style="
-        padding:0.30rem 0.70rem;
-        border-radius:0.60rem;
+        padding:0.40rem 0.85rem;
+        border-radius:0.80rem;
         background-color:{colour};
         font-weight:600;
-        font-size:0.85rem;
-        color:#111827;
-        margin-bottom:0.35rem;
+        font-size:0.86rem;
+        color:#0f172a;
+        margin-bottom:0.40rem;
+        border:1px solid rgba(148,163,184,0.6);
     ">
       {title}
     </div>
@@ -288,6 +280,10 @@ def apply_search_filter(
 
 
 def main():
+    st.set_page_config(
+        page_title="Who’s on shift?", layout="wide"
+    )
+
     # Soft background + hide Streamlit chrome
     st.markdown(
         """
@@ -295,8 +291,6 @@ def main():
         .stApp {background-color: #f6f7fb;}
         #MainMenu {visibility: hidden;}
         footer {visibility: hidden;}
-        /* tighten up main container a bit */
-        .block-container {padding-top: 1.5rem; padding-bottom: 2rem;}
         </style>
         """,
         unsafe_allow_html=True,
@@ -315,39 +309,40 @@ def main():
     )
 
     # ----- Header ----- #
-    st.markdown("## Who's on shift?")
+    st.markdown("# Who's on shift?")
     st.caption(
-        f"Current time (UTC): {now_utc.strftime('%Y-%m-%d %H:%M:%S')}  ·  Local zone label: {local_tz_label}"
+        f"Current time (UTC): {now_utc.strftime('%Y-%m-%d %H:%M:%S')}  |  Local zone label: {local_tz_label}"
     )
-    st.markdown("---")
 
-    # ----- Controls (site + search + refresh) in one row ----- #
-    c_site, c_search, c_refresh = st.columns([1.1, 2.0, 0.9])
+    st.markdown("")  # small spacing
 
-    with c_site:
+    # ----- Controls row ----- #
+    controls_left, controls_mid, controls_right = st.columns([0.32, 0.48, 0.20])
+
+    with controls_left:
         site_options = ["All locations"] + [
             f"{cfg['flag']} {cfg['label']}" for cfg in ACTIVE_SITES.values()
         ]
         site_choice = st.selectbox("Location", site_options, index=0)
 
-    with c_search:
+    with controls_mid:
         search_text = st.text_input(
-            "🔍 Search by name or role",
+            "Search by name or role",
             placeholder="e.g. 'Shauna', 'MC', 'Flight Operator'",
         )
 
-    with c_refresh:
+    with controls_right:
         st.write("")  # vertical spacing
-        st.write("")  # small extra spacing
         if st.button("Refresh now", use_container_width=True):
             st.cache_data.clear()
             st.rerun()
 
-    st.markdown("")  # small spacing
+    st.markdown("---")
 
+    # ----- Data ----- #
     try:
         all_sites = get_active_shifts(now_utc)
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001
         st.error(f"Error fetching or parsing schedule: {e}")
         return
 
@@ -357,6 +352,7 @@ def main():
 
     # Filter by site selection
     if site_choice != "All locations":
+        # Map choice back to site_id by matching label+flag
         chosen = None
         for site_id, cfg in ACTIVE_SITES.items():
             label = f"{cfg['flag']} {cfg['label']}"
@@ -397,40 +393,33 @@ def main():
 
         # Location header
         st.markdown(f"### {flag} {label}")
-
-        # Small summary badges
-        col_mc, col_pilot, col_other = st.columns(3)
-        with col_mc:
-            st.markdown(
-                "<div style='font-size:0.8rem; color:#059669;'>● MC: "
-                f"{mc_count}</div>",
-                unsafe_allow_html=True,
-            )
-        with col_pilot:
-            st.markdown(
-                "<div style='font-size:0.8rem; color:#2563eb;'>● Pilot: "
-                f"{pilot_count}</div>",
-                unsafe_allow_html=True,
-            )
-        with col_other:
-            st.markdown(
-                "<div style='font-size:0.8rem; color:#6b21a8;'>● Other: "
-                f"{other_count}</div>",
-                unsafe_allow_html=True,
-            )
-
-        st.markdown("")  # spacing
+        st.markdown("")  # spacing under site heading
 
         col1, col2, col3 = st.columns([1, 1, 1.05])
 
         with col1:
-            render_role_column("MC", "#e9f7ef", roles["MC"], is_other=False)
+            render_role_column(
+                f"MC ({mc_count})",
+                "#dcfce7",  # green-ish
+                roles["MC"],
+                is_other=False,
+            )
 
         with col2:
-            render_role_column("PILOT", "#e5f0ff", roles["Pilot"], is_other=False)
+            render_role_column(
+                f"Pilot ({pilot_count})",
+                "#dbeafe",  # blue-ish
+                roles["Pilot"],
+                is_other=False,
+            )
 
         with col3:
-            render_role_column("OTHER ROLES", "#f4e9ff", roles["Other"], is_other=True)
+            render_role_column(
+                f"Other roles ({other_count})",
+                "#f3e8ff",  # purple-ish
+                roles["Other"],
+                is_other=True,
+            )
 
         st.markdown("---")
 
