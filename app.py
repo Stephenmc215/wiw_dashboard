@@ -21,12 +21,12 @@ st.set_page_config(
 SITE_CONFIG = {
     "dublin15": {
         "env_var": "WIW_ICS_URL_DUBLIN15",
-        "label": "IE Dublin 15",
+        "label": "Dublin 15",
         "flag": "🇮🇪",
     },
     "espoo": {
         "env_var": "WIW_ICS_URL_ESPOO",
-        "label": "FI Espoo",
+        "label": "Espoo",
         "flag": "🇫🇮",
     },
 }
@@ -203,16 +203,18 @@ def render_person_card(person: Dict):
 
     card_html = f"""
     <div style="
-        padding:0.55rem 0.8rem;
-        border-radius:0.6rem;
+        padding:0.70rem 1.0rem;
+        border-radius:0.75rem;
         background-color:#ffffff;
-        margin-top:0.35rem;
-        box-shadow:0 0 0 1px #e5e7eb;
+        margin-top:0.45rem;
+        box-shadow:0 1px 2px rgba(15,23,42,0.04);
+        border:1px solid #e5e7eb;
     ">
-      <div style="font-weight:600; color:#111827;">{name}</div>
-      <div style="font-size:0.85rem; color:#4b5563; margin-top:0.1rem;">{role}</div>
-      <div style="font-size:0.8rem; color:#059669; margin-top:0.25rem;">
-        ● On until {end_label}
+      <div style="font-weight:600; color:#111827; font-size:0.95rem;">{name}</div>
+      <div style="font-size:0.85rem; color:#4b5563; margin-top:0.15rem;">{role}</div>
+      <div style="font-size:0.78rem; color:#6b7280; margin-top:0.35rem; display:flex; align-items:center; gap:0.30rem;">
+        <span style="display:inline-block; width:7px; height:7px; border-radius:999px; background-color:#10b981;"></span>
+        <span>On until {end_label}</span>
       </div>
     </div>
     """
@@ -226,20 +228,19 @@ def render_role_column(title: str, colour: str, people: List[Dict], is_other: bo
     """
     header_html = f"""
     <div style="
-        padding:0.35rem 0.75rem;
-        border-radius:0.6rem;
+        padding:0.30rem 0.70rem;
+        border-radius:0.60rem;
         background-color:{colour};
         font-weight:600;
-        font-size:0.9rem;
+        font-size:0.85rem;
         color:#111827;
-        margin-bottom:0.3rem;
+        margin-bottom:0.35rem;
     ">
       {title}
     </div>
     """
 
     if is_other:
-        # Make a single column with an expander
         count = len(people)
         with st.expander(f"Other roles ({count})", expanded=False):
             st.markdown(header_html, unsafe_allow_html=True)
@@ -294,6 +295,8 @@ def main():
         .stApp {background-color: #f6f7fb;}
         #MainMenu {visibility: hidden;}
         footer {visibility: hidden;}
+        /* tighten up main container a bit */
+        .block-container {padding-top: 1.5rem; padding-bottom: 2rem;}
         </style>
         """,
         unsafe_allow_html=True,
@@ -312,31 +315,35 @@ def main():
     )
 
     # ----- Header ----- #
-    top_left, top_right = st.columns([0.75, 0.25])
-    with top_left:
-        st.markdown("## Who's on shift?")
-        st.caption(
-            f"Current time (UTC): {now_utc.strftime('%Y-%m-%d %H:%M:%S')}  |  Local zone label: {local_tz_label}"
+    st.markdown("## Who's on shift?")
+    st.caption(
+        f"Current time (UTC): {now_utc.strftime('%Y-%m-%d %H:%M:%S')}  ·  Local zone label: {local_tz_label}"
+    )
+    st.markdown("---")
+
+    # ----- Controls (site + search + refresh) in one row ----- #
+    c_site, c_search, c_refresh = st.columns([1.1, 2.0, 0.9])
+
+    with c_site:
+        site_options = ["All locations"] + [
+            f"{cfg['flag']} {cfg['label']}" for cfg in ACTIVE_SITES.values()
+        ]
+        site_choice = st.selectbox("Location", site_options, index=0)
+
+    with c_search:
+        search_text = st.text_input(
+            "🔍 Search by name or role",
+            placeholder="e.g. 'Shauna', 'MC', 'Flight Operator'",
         )
 
-    with top_right:
+    with c_refresh:
         st.write("")  # vertical spacing
+        st.write("")  # small extra spacing
         if st.button("Refresh now", use_container_width=True):
             st.cache_data.clear()
             st.rerun()
 
-    st.markdown("---")
-
-    # ----- Controls ----- #
-    site_options = ["All locations"] + [
-        f"{cfg['flag']} {cfg['label']}" for cfg in ACTIVE_SITES.values()
-    ]
-    site_choice = st.selectbox("Select site", site_options, index=0)
-
-    search_text = st.text_input(
-        "Search by name or role",
-        placeholder="Type to filter (e.g. 'Darragh', 'MC', 'Flight Operator')",
-    )
+    st.markdown("")  # small spacing
 
     try:
         all_sites = get_active_shifts(now_utc)
@@ -350,7 +357,6 @@ def main():
 
     # Filter by site selection
     if site_choice != "All locations":
-        # Map choice back to site_id by matching label+flag
         chosen = None
         for site_id, cfg in ACTIVE_SITES.items():
             label = f"{cfg['flag']} {cfg['label']}"
@@ -389,28 +395,33 @@ def main():
         pilot_count = len(roles["Pilot"])
         other_count = len(roles["Other"])
 
+        # Location header
         st.markdown(f"### {flag} {label}")
+
         # Small summary badges
         col_mc, col_pilot, col_other = st.columns(3)
         with col_mc:
             st.markdown(
-                f"<div style='font-size:0.8rem; color:#059669;'>● MC: {mc_count}</div>",
+                "<div style='font-size:0.8rem; color:#059669;'>● MC: "
+                f"{mc_count}</div>",
                 unsafe_allow_html=True,
             )
         with col_pilot:
             st.markdown(
-                f"<div style='font-size:0.8rem; color:#2563eb;'>● Pilot: {pilot_count}</div>",
+                "<div style='font-size:0.8rem; color:#2563eb;'>● Pilot: "
+                f"{pilot_count}</div>",
                 unsafe_allow_html=True,
             )
         with col_other:
             st.markdown(
-                f"<div style='font-size:0.8rem; color:#6b21a8;'>● Other: {other_count}</div>",
+                "<div style='font-size:0.8rem; color:#6b21a8;'>● Other: "
+                f"{other_count}</div>",
                 unsafe_allow_html=True,
             )
 
         st.markdown("")  # spacing
 
-        col1, col2, col3 = st.columns([1, 1, 1.1])
+        col1, col2, col3 = st.columns([1, 1, 1.05])
 
         with col1:
             render_role_column("MC", "#e9f7ef", roles["MC"], is_other=False)
