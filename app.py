@@ -285,18 +285,23 @@ def main():
     )
 
     # Soft background + hide Streamlit chrome
-    st.markdown(    """
-    <style>
-    .title-underline {
-        font-size: 2rem;
-        font-weight: 700;
-        border-bottom: 3px solid #6366f1; /* indigo */
-        padding-bottom: 0.4rem;
+    st.markdown(   
+        """
+        <style>
+        .title-bar {
+        background-color: #e0e7ff;  /* soft indigo */
+        padding: 1.2rem 2rem;
+        border-radius: 0.75rem;
         margin-bottom: 1rem;
-    }
-    </style>
-    <div class="title-underline">Who’s on shift?</div>
-    """,
+        border: 1px solid #c7d2fe;
+        }
+        .title-bar h1 {
+        color: #1e3a8a !important;  /* dark indigo text */
+        font-weight: 700;
+        margin: 0;
+        }
+        </style>
+        """,
     unsafe_allow_html=True,
     )
 
