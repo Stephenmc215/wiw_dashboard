@@ -286,21 +286,19 @@ def main():
 
     # Soft background + hide Streamlit chrome
     st.markdown(
-        """
-        <style>
-        .title-bar {
-        background-color: #e0e7ff;  /* soft indigo */
-        padding: 1.2rem 2rem;
-        border-radius: 0.75rem;
-        margin-bottom: 1rem;
-        border: 1px solid #c7d2fe;
-    }
-    .title-bar h1 {
-        color: #1e3a8a !important;  /* dark indigo text */
+    """
+    <style>
+    .full-title {
+        background-color: #2563eb; /* blue */
+        padding: 1.3rem 2rem;
+        color: white !important;
+        font-size: 2rem;
         font-weight: 700;
-        margin: 0;
+        border-radius: 0.5rem;
+        margin-bottom: 1.2rem;
     }
     </style>
+    <div class="full-title">Who’s on shift?</div>
     """,
     unsafe_allow_html=True,
     )
