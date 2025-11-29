@@ -285,20 +285,17 @@ def main():
     )
 
     # Soft background + hide Streamlit chrome
-    st.markdown(
-    """
+    st.markdown(    """
     <style>
-    .full-title {
-        background-color: #2563eb; /* blue */
-        padding: 1.3rem 2rem;
-        color: white !important;
+    .title-underline {
         font-size: 2rem;
         font-weight: 700;
-        border-radius: 0.5rem;
-        margin-bottom: 1.2rem;
+        border-bottom: 3px solid #6366f1; /* indigo */
+        padding-bottom: 0.4rem;
+        margin-bottom: 1rem;
     }
     </style>
-    <div class="full-title">Who’s on shift?</div>
+    <div class="title-underline">Who’s on shift?</div>
     """,
     unsafe_allow_html=True,
     )
