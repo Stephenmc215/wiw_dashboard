@@ -288,12 +288,21 @@ def main():
     st.markdown(
         """
         <style>
-        .stApp {background-color: #f6f7fb;}
-        #MainMenu {visibility: hidden;}
-        footer {visibility: hidden;}
-        </style>
-        """,
-        unsafe_allow_html=True,
+        .title-bar {
+        background-color: #e0e7ff;  /* soft indigo */
+        padding: 1.2rem 2rem;
+        border-radius: 0.75rem;
+        margin-bottom: 1rem;
+        border: 1px solid #c7d2fe;
+    }
+    .title-bar h1 {
+        color: #1e3a8a !important;  /* dark indigo text */
+        font-weight: 700;
+        margin: 0;
+    }
+    </style>
+    """,
+    unsafe_allow_html=True,
     )
 
     if not ACTIVE_SITES:
