@@ -558,36 +558,27 @@ def main():
     )
 
     # ----- Controls ----- #
+        # ----- Controls ----- #
     st.markdown("")
     col_loc, col_search, col_refresh = st.columns([0.32, 0.48, 0.20])
 
-with col_loc:
-    st.markdown("**Location**")
+    with col_loc:
+        site_options = ["All locations"] + [
+            f"{cfg['flag']} {cfg['label']}" for cfg in ACTIVE_SITES.values()
+        ]
+        site_choice = st.selectbox("Location", site_options, index=0)
 
-    # List of visible labels
-    site_labels = ["All locations"] + [
-        f"{cfg['flag']} {cfg['label']}" for cfg in ACTIVE_SITES.values()
-    ]
+    with col_search:
+        search_text = st.text_input(
+            "Search by name or role",
+            placeholder="e.g. 'Shauna', 'MC', 'Flight Operator'",
+        )
 
-    # Initialise session state
-    if "site_choice" not in st.session_state:
-        st.session_state.site_choice = "All locations"
-
-    # Render pill buttons horizontally
-    cols = st.columns(len(site_labels))
-    for col, label in zip(cols, site_labels):
-        with col:
-            clicked = st.button(
-                label,
-                key=f"sitebtn_{label}",
-            )
-            if clicked:
-                st.session_state.site_choice = label
-
-    # Set selected location
-    site_choice = st.session_state.site_choice
-
-    st.caption(f"Selected: **{site_choice}**")
+    with col_refresh:
+        st.write("")  # spacing
+        if st.button("Refresh now", use_container_width=True):
+            st.cache_data.clear()
+            st.rerun()
 
     # Get full picture once
     try:
