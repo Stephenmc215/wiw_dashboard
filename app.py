@@ -562,10 +562,16 @@ def main():
     col_loc, col_search, col_refresh = st.columns([0.32, 0.48, 0.20])
 
     with col_loc:
-        site_options = ["All locations"] + [
-            f"{cfg['flag']} {cfg['label']}" for cfg in ACTIVE_SITES.values()
-        ]
-        site_choice = st.selectbox("Location", site_options, index=0)
+site_labels = ["All locations"] + [
+    f"{cfg['flag']} {cfg['label']}" for cfg in ACTIVE_SITES.values()
+]
+
+site_choice = st.radio(
+    "Location",
+    site_labels,
+    horizontal=True,
+)
+
 
     with col_search:
         search_text = st.text_input(
