@@ -240,43 +240,35 @@ def regroup_for_mc_view(all_sites: Dict[str, Dict]) -> Dict[str, Dict]:
 
 def fetch_latest_otns() -> List[Dict]:
     """
-    Fetch the latest 2 OTNs for MCs.
+    Build the latest OTNs list from environment variables / Streamlit secrets.
 
-    Right now this is just a placeholder that returns an empty list.
-    Your SW / IT team can plug SharePoint here using the OTN_SOURCE
-    settings and something like `office365-rest-python-client` or a
-    simple CSV/JSON export.
+    Expected env keys (already in your .env / secrets):
+      OTN1_TITLE, OTN1_URL
+      OTN2_TITLE, OTN2_URL
 
-    Expected return shape:
-    [
-      {
-        "title": "OTN-123 – Something happened",
-        "created": "2025-11-29 14:31",
-        "summary": "Short description...",
-        "link": "https://some.sharepoint.url/..."
-      },
-      ...
-    ]
+    You can add OTN3_*, OTN4_* later if you want – the loop will pick them up.
     """
-    # If you want to test the layout with fake data, uncomment below:
+    otns: List[Dict] = []
 
-    # return [
-    #     {
-    #         "title": "OTN-123 – Example only",
-    #         "created": "2025-11-29 14:31",
-    #         "summary": "This is a demo OTN card. Wire SharePoint to replace this.",
-    #         "link": "https://example.com",
-    #     },
-    #     {
-    #         "title": "OTN-122 – Another example",
-    #         "created": "2025-11-29 13:10",
-    #         "summary": "Second demo OTN card for layout.",
-    #         "link": "https://example.com",
-    #     },
-    # ]
+    # how many OTNs you want to support via env vars
+    for idx in (1, 2):
+        title = os.getenv(f"OTN{idx}_TITLE")
+        url = os.getenv(f"OTN{idx}_URL")
 
-    # No SharePoint integration yet → return empty
-    return []
+        if not (title and url):
+            continue
+
+        otns.append(
+            {
+                "title": title,
+                # optional fields – you can hard-code or add more env vars later
+                "created": "",  # e.g. "2025-12-03 13:15"
+                "summary": "",  # short description if you want one
+                "link": url,
+            }
+        )
+
+    return otns
 
 
 def render_otn_cards():
