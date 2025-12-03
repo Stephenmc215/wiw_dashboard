@@ -562,14 +562,31 @@ def main():
     col_loc, col_search, col_refresh = st.columns([0.32, 0.48, 0.20])
 
     with col_loc:
-        with col_loc:
-            site_labels = ["All locations"] + [
-                f"{cfg['flag']} {cfg['label']}" for cfg in ACTIVE_SITES.values()
-    ]
-    site_choice = st.radio(
-        "Location",
-        site_labels,
-    )
+        st.markdown("**Location**")
+        # List of visible labels
+        site_labels = ["All locations"] + [
+        f"{cfg['flag']} {cfg['label']}" for cfg in ACTIVE_SITES.values()
+        ]
+
+    # Store selected label
+        if "site_choice" not in st.session_state:
+        st.session_state.site_choice = "All locations"
+
+    # Render pill-style buttons
+        cols = st.columns(len(site_labels))
+        for col, label in zip(cols, site_labels):
+         with col:
+                clicked = st.button(
+                 label,
+                 key=f"sitebtn_{label}",
+             )
+             if clicked:
+                st.session_state.site_choice = label
+
+        site_choice = st.session_state.site_choice
+
+     # Small selected indicator
+        st.caption(f"Selected: **{site_choice}**")
 
 
 
