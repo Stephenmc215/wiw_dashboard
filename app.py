@@ -561,48 +561,33 @@ def main():
     st.markdown("")
     col_loc, col_search, col_refresh = st.columns([0.32, 0.48, 0.20])
 
-    with col_loc:
-        st.markdown("**Location**")
-        # List of visible labels
-        site_labels = ["All locations"] + [
-        f"{cfg['flag']} {cfg['label']}" for cfg in ACTIVE_SITES.values()
-        ]
+with col_loc:
+    st.markdown("**Location**")
 
-    # Store selected label
-        if "site_choice" not in st.session_state:
+    # List of visible labels
+    site_labels = ["All locations"] + [
+        f"{cfg['flag']} {cfg['label']}" for cfg in ACTIVE_SITES.values()
+    ]
+
+    # Initialise session state
+    if "site_choice" not in st.session_state:
         st.session_state.site_choice = "All locations"
 
-    # Render pill-style buttons
-        cols = st.columns(len(site_labels))
-        for col, label in zip(cols, site_labels):
-         with col:
-                clicked = st.button(
-                 label,
-                 key=f"sitebtn_{label}",
-             )
-             if clicked:
+    # Render pill buttons horizontally
+    cols = st.columns(len(site_labels))
+    for col, label in zip(cols, site_labels):
+        with col:
+            clicked = st.button(
+                label,
+                key=f"sitebtn_{label}",
+            )
+            if clicked:
                 st.session_state.site_choice = label
 
-        site_choice = st.session_state.site_choice
+    # Set selected location
+    site_choice = st.session_state.site_choice
 
-     # Small selected indicator
-        st.caption(f"Selected: **{site_choice}**")
-
-
-
-    with col_search:
-        search_text = st.text_input(
-            "Search by name or role",
-            placeholder="e.g. 'Shauna', 'MC', 'Flight Operator'",
-        )
-
-    with col_refresh:
-        st.write("")  # vertical spacing
-        if st.button("Refresh now", use_container_width=True):
-            st.cache_data.clear()
-            st.rerun()
-
-    st.markdown("")
+    st.caption(f"Selected: **{site_choice}**")
 
     # Get full picture once
     try:
