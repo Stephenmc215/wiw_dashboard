@@ -6,6 +6,16 @@ import requests
 import streamlit as st
 from dotenv import load_dotenv
 
+# 🎯 STEP 3 — Auto-refresh helper
+# Try to use streamlit-autorefresh if available; otherwise, fall back to a no-op.
+try:
+    from streamlit_autorefresh import st_autorefresh
+except ImportError:
+    # Fallback: define a dummy st_autorefresh so the app still runs without the extra package.
+    def st_autorefresh(*args, **kwargs):
+        return None
+
+
 # Load .env locally (Streamlit Cloud will inject env vars via Secrets)
 load_dotenv()
 
@@ -25,7 +35,6 @@ SITE_CONFIG = {
 }
 
 # Optional: URL or identifier for OTNs feed (SharePoint, etc.)
-# For now this is unused – your SW team can wire this into fetch_latest_otns().
 OTN_SOURCE = os.getenv("OTN_SHAREPOINT_URL", "")
 
 
@@ -57,13 +66,13 @@ def parse_events_from_ics(ics_text: str) -> List[Dict]:
             current = None
         elif current is not None:
             if line.startswith("DTSTART:"):
-                current["start"] = parse_ics_datetime(line[len("DTSTART:") :])
+                current["start"] = parse_ics_datetime(line[len("DTSTART:"):])
             elif line.startswith("DTEND:"):
-                current["end"] = parse_ics_datetime(line[len("DTEND:") :])
+                current["end"] = parse_ics_datetime(line[len("DTEND:"):])
             elif line.startswith("SUMMARY:"):
-                current["summary"] = line[len("SUMMARY:") :]
+                current["summary"] = line[len("SUMMARY:"):]
             elif line.startswith("LOCATION:"):
-                loc = line[len("LOCATION:") :]
+                loc = line[len("LOCATION:"):]
                 current["location_raw"] = loc
 
     return events
@@ -245,8 +254,6 @@ def fetch_latest_otns() -> List[Dict]:
     Expected env keys (already in your .env / secrets):
       OTN1_TITLE, OTN1_URL
       OTN2_TITLE, OTN2_URL
-
-    You can add OTN3_*, OTN4_* later if you want – the loop will pick them up.
     """
     otns: List[Dict] = []
 
@@ -286,28 +293,28 @@ def render_otn_cards():
     for col, otn in zip(cols, otns):
         with col:
             card_html = f"""
-            <div style="
-                padding:0.75rem 0.9rem;
-                border-radius:0.7rem;
-                background-color:#ffffff;
-                box-shadow:0 0 0 1px #e5e7eb;
-                margin-bottom:0.6rem;
-            ">
-              <div style="font-weight:600; color:#111827; margin-bottom:0.25rem;">
-                {otn.get('title', 'OTN')}
-              </div>
-              <div style="font-size:0.8rem; color:#6b7280; margin-bottom:0.35rem;">
-                {otn.get('created', '')}
-              </div>
-              <div style="font-size:0.85rem; color:#374151; margin-bottom:0.5rem;">
-                {otn.get('summary', '')}
-              </div>
-              <div style="font-size:0.8rem;">
-                <a href="{otn.get('link', '#')}" target="_blank" style="color:#2563eb; text-decoration:none;">
-                  Open in SharePoint ↗
-                </a>
-              </div>
-            </div>
+                <div style="
+                    padding:0.75rem 0.9rem;
+                    border-radius:0.7rem;
+                    background-color:#ffffff;
+                    box-shadow:0 0 0 1px #e5e7eb;
+                    margin-bottom:0.6rem;
+                ">
+                  <div style="font-weight:600; color:#111827; margin-bottom:0.25rem;">
+                    {otn.get('title', 'OTN')}
+                  </div>
+                  <div style="font-size:0.8rem; color:#6b7280; margin-bottom:0.35rem;">
+                    {otn.get('created', '')}
+                  </div>
+                  <div style="font-size:0.85rem; color:#374151; margin-bottom:0.5rem;">
+                    {otn.get('summary', '')}
+                  </div>
+                  <div style="font-size:0.8rem;">
+                    <a href="{otn.get('link', '#')}" target="_blank" style="color:#2563eb; text-decoration:none;">
+                      Open in SharePoint ↗
+                    </a>
+                  </div>
+                </div>
             """
             st.markdown(card_html, unsafe_allow_html=True)
 
@@ -328,19 +335,19 @@ def render_person_card(person: Dict):
     end_label = format_end_time_local(person["end"])
 
     card_html = f"""
-    <div style="
-        padding:0.55rem 0.8rem;
-        border-radius:0.6rem;
-        background-color:#ffffff;
-        margin-top:0.35rem;
-        box-shadow:0 0 0 1px #e5e7eb;
-    ">
-      <div style="font-weight:600; color:#111827;">{name}</div>
-      <div style="font-size:0.85rem; color:#4b5563; margin-top:0.1rem;">{role}</div>
-      <div style="font-size:0.8rem; color:#047857; margin-top:0.25rem;">
-        ● On until {end_label}
-      </div>
-    </div>
+        <div style="
+            padding:0.55rem 0.8rem;
+            border-radius:0.6rem;
+            background-color:#ffffff;
+            margin-top:0.35rem;
+            box-shadow:0 0 0 1px #e5e7eb;
+        ">
+          <div style="font-weight:600; color:#111827;">{name}</div>
+          <div style="font-size:0.85rem; color:#4b5563; margin-top:0.1rem;">{role}</div>
+          <div style="font-size:0.8rem; color:#047857; margin-top:0.25rem;">
+            ● On until {end_label}
+          </div>
+        </div>
     """
     st.markdown(card_html, unsafe_allow_html=True)
 
@@ -351,17 +358,17 @@ def render_role_column(title: str, colour: str, people: List[Dict], is_other: bo
     colour = background colour of the header bar.
     """
     header_html = f"""
-    <div style="
-        padding:0.35rem 0.75rem;
-        border-radius:0.6rem;
-        background-color:{colour};
-        font-weight:600;
-        font-size:0.9rem;
-        color:#111827;
-        margin-bottom:0.3rem;
-    ">
-      {title}
-    </div>
+        <div style="
+            padding:0.35rem 0.75rem;
+            border-radius:0.6rem;
+            background-color:{colour};
+            font-weight:600;
+            font-size:0.9rem;
+            color:#111827;
+            margin-bottom:0.3rem;
+        ">
+          {title}
+        </div>
     """
 
     if is_other:
@@ -522,6 +529,9 @@ def render_mc_site_section(site_id: str, site_data: Dict):
 def main():
     st.set_page_config(page_title="Who’s on shift?", layout="wide")
 
+    # 🎯 STEP 3 — built-in auto-refresh to keep the UI fresh (every 2 minutes)
+    st_autorefresh(interval=120000, key="shift-autorefresh")
+
     # Soft background + minimal Streamlit chrome
     st.markdown(
         """
@@ -558,7 +568,6 @@ def main():
     )
 
     # ----- Controls ----- #
-        # ----- Controls ----- #
     st.markdown("")
     col_loc, col_search, col_refresh = st.columns([0.32, 0.48, 0.20])
 
@@ -568,6 +577,16 @@ def main():
         ]
         site_choice = st.selectbox("Location", site_options, index=0)
 
+    site_labels = ["All locations"] + [
+        f"{cfg['flag']} {cfg['label']}" for cfg in ACTIVE_SITES.values()
+    ]
+
+    site_choice = st.radio(
+        "Location",
+        site_labels,
+        horizontal=True,
+    )
+
     with col_search:
         search_text = st.text_input(
             "Search by name or role",
@@ -575,17 +594,21 @@ def main():
         )
 
     with col_refresh:
-        st.write("")  # spacing
+        st.write("")  # vertical spacing
         if st.button("Refresh now", use_container_width=True):
             st.cache_data.clear()
             st.rerun()
 
-    # Get full picture once
+    st.markdown("")
+
+    # 🎯 STEP 4 — Make sure errors don’t kill the app
     try:
+        # Expensive: ICS fetch + parsing
         all_sites = get_active_shifts(now_utc)
     except Exception as e:
-        st.error(f"Error fetching or parsing schedule: {e}")
-        return
+        st.error("Error loading data, retrying…")
+        # Optional: log the error somewhere if you have logging wired up
+        st.stop()
 
     if not all_sites:
         st.info("No one is currently on shift according to the schedule.")
