@@ -606,7 +606,7 @@ def main():
     with col_search:
         search_text = st.text_input(
             "Search by name or role",
-            placeholder="e.g. 'Shauna', 'MC', 'Flight Operator'",
+            placeholder="e.g. 'John Doe', 'MC', 'Flight Operator'",
         )
 
     with col_refresh:
