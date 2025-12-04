@@ -6,16 +6,6 @@ import requests
 import streamlit as st
 from dotenv import load_dotenv
 
-# 🎯 STEP 3 — Auto-refresh helper
-# Try to use streamlit-autorefresh if available; otherwise, fall back to a no-op.
-try:
-    from streamlit_autorefresh import st_autorefresh
-except ImportError:
-    # Fallback: define a dummy st_autorefresh so the app still runs without the extra package.
-    def st_autorefresh(*args, **kwargs):
-        return None
-
-
 # Load .env locally (Streamlit Cloud will inject env vars via Secrets)
 load_dotenv()
 
@@ -66,13 +56,13 @@ def parse_events_from_ics(ics_text: str) -> List[Dict]:
             current = None
         elif current is not None:
             if line.startswith("DTSTART:"):
-                current["start"] = parse_ics_datetime(line[len("DTSTART:"):])
+                current["start"] = parse_ics_datetime(line[len("DTSTART:") :])
             elif line.startswith("DTEND:"):
-                current["end"] = parse_ics_datetime(line[len("DTEND:"):])
+                current["end"] = parse_ics_datetime(line[len("DTEND:") :])
             elif line.startswith("SUMMARY:"):
-                current["summary"] = line[len("SUMMARY:"):]
+                current["summary"] = line[len("SUMMARY:") :]
             elif line.startswith("LOCATION:"):
-                loc = line[len("LOCATION:"):]
+                loc = line[len("LOCATION:") :]
                 current["location_raw"] = loc
 
     return events
@@ -244,7 +234,7 @@ def regroup_for_mc_view(all_sites: Dict[str, Dict]) -> Dict[str, Dict]:
     return mc_results
 
 
-# ----------------- OTN (SharePoint) ----------------- #
+# ----------------- OTN (SharePoint / env) ----------------- #
 
 
 def fetch_latest_otns() -> List[Dict]:
@@ -257,7 +247,6 @@ def fetch_latest_otns() -> List[Dict]:
     """
     otns: List[Dict] = []
 
-    # how many OTNs you want to support via env vars
     for idx in (1, 2):
         title = os.getenv(f"OTN{idx}_TITLE")
         url = os.getenv(f"OTN{idx}_URL")
@@ -268,9 +257,8 @@ def fetch_latest_otns() -> List[Dict]:
         otns.append(
             {
                 "title": title,
-                # optional fields – you can hard-code or add more env vars later
-                "created": "",  # e.g. "2025-12-03 13:15"
-                "summary": "",  # short description if you want one
+                "created": "",  # optional
+                "summary": "",  # optional
                 "link": url,
             }
         )
@@ -293,28 +281,28 @@ def render_otn_cards():
     for col, otn in zip(cols, otns):
         with col:
             card_html = f"""
-                <div style="
-                    padding:0.75rem 0.9rem;
-                    border-radius:0.7rem;
-                    background-color:#ffffff;
-                    box-shadow:0 0 0 1px #e5e7eb;
-                    margin-bottom:0.6rem;
-                ">
-                  <div style="font-weight:600; color:#111827; margin-bottom:0.25rem;">
-                    {otn.get('title', 'OTN')}
-                  </div>
-                  <div style="font-size:0.8rem; color:#6b7280; margin-bottom:0.35rem;">
-                    {otn.get('created', '')}
-                  </div>
-                  <div style="font-size:0.85rem; color:#374151; margin-bottom:0.5rem;">
-                    {otn.get('summary', '')}
-                  </div>
-                  <div style="font-size:0.8rem;">
-                    <a href="{otn.get('link', '#')}" target="_blank" style="color:#2563eb; text-decoration:none;">
-                      Open in SharePoint ↗
-                    </a>
-                  </div>
-                </div>
+            <div style="
+                padding:0.75rem 0.9rem;
+                border-radius:0.7rem;
+                background-color:#ffffff;
+                box-shadow:0 0 0 1px #e5e7eb;
+                margin-bottom:0.6rem;
+            ">
+              <div style="font-weight:600; color:#111827; margin-bottom:0.25rem;">
+                {otn.get('title', 'OTN')}
+              </div>
+              <div style="font-size:0.8rem; color:#6b7280; margin-bottom:0.35rem;">
+                {otn.get('created', '')}
+              </div>
+              <div style="font-size:0.85rem; color:#374151; margin-bottom:0.5rem;">
+                {otn.get('summary', '')}
+              </div>
+              <div style="font-size:0.8rem;">
+                <a href="{otn.get('link', '#')}" target="_blank" style="color:#2563eb; text-decoration:none;">
+                  Open in SharePoint ↗
+                </a>
+              </div>
+            </div>
             """
             st.markdown(card_html, unsafe_allow_html=True)
 
@@ -335,19 +323,19 @@ def render_person_card(person: Dict):
     end_label = format_end_time_local(person["end"])
 
     card_html = f"""
-        <div style="
-            padding:0.55rem 0.8rem;
-            border-radius:0.6rem;
-            background-color:#ffffff;
-            margin-top:0.35rem;
-            box-shadow:0 0 0 1px #e5e7eb;
-        ">
-          <div style="font-weight:600; color:#111827;">{name}</div>
-          <div style="font-size:0.85rem; color:#4b5563; margin-top:0.1rem;">{role}</div>
-          <div style="font-size:0.8rem; color:#047857; margin-top:0.25rem;">
-            ● On until {end_label}
-          </div>
-        </div>
+    <div style="
+        padding:0.55rem 0.8rem;
+        border-radius:0.6rem;
+        background-color:#ffffff;
+        margin-top:0.35rem;
+        box-shadow:0 0 0 1px #e5e7eb;
+    ">
+      <div style="font-weight:600; color:#111827;">{name}</div>
+      <div style="font-size:0.85rem; color:#4b5563; margin-top:0.1rem;">{role}</div>
+      <div style="font-size:0.8rem; color:#047857; margin-top:0.25rem;">
+        ● On until {end_label}
+      </div>
+    </div>
     """
     st.markdown(card_html, unsafe_allow_html=True)
 
@@ -358,17 +346,17 @@ def render_role_column(title: str, colour: str, people: List[Dict], is_other: bo
     colour = background colour of the header bar.
     """
     header_html = f"""
-        <div style="
-            padding:0.35rem 0.75rem;
-            border-radius:0.6rem;
-            background-color:{colour};
-            font-weight:600;
-            font-size:0.9rem;
-            color:#111827;
-            margin-bottom:0.3rem;
-        ">
-          {title}
-        </div>
+    <div style="
+        padding:0.35rem 0.75rem;
+        border-radius:0.6rem;
+        background-color:{colour};
+        font-weight:600;
+        font-size:0.9rem;
+        color:#111827;
+        margin-bottom:0.3rem;
+    ">
+      {title}
+    </div>
     """
 
     if is_other:
@@ -411,6 +399,9 @@ def apply_search_filter(all_sites: Dict[str, Dict], search_text: str) -> Dict[st
             filtered[site_id] = {"meta": site_data["meta"], "roles": new_roles}
 
     return filtered
+
+
+# ----------------- PER-VIEW RENDERING ----------------- #
 
 
 def render_standard_site_section(site_id: str, site_data: Dict):
@@ -462,7 +453,17 @@ def render_standard_site_section(site_id: str, site_data: Dict):
 
 
 def render_mc_site_section(site_id: str, site_data: Dict):
-    """Per-site layout for the MC-focused view."""
+    """
+    Per-site layout for the MC-focused view.
+
+    We keep single headers:
+      - Flight operators (N)
+      - Loaders (N)
+      - Collectors (N)
+
+    but *inside* Loaders and Collectors we order:
+      BT first, then CM, then anything else.
+    """
     meta = site_data["meta"]
     roles = site_data["roles"]
 
@@ -473,6 +474,30 @@ def render_mc_site_section(site_id: str, site_data: Dict):
     loader_count = len(roles["Loader"])
     collector_count = len(roles["Collector"])
     other_count = len(roles["Other"])
+
+    # Custom sort helpers for loaders & collectors
+    def loader_sort_key(p: Dict):
+        r = p["role"].lower()
+        if "bt loader" in r:
+            priority = 0
+        elif "cm loader" in r:
+            priority = 1
+        else:
+            priority = 2
+        return (priority, p["name"])
+
+    def collector_sort_key(p: Dict):
+        r = p["role"].lower()
+        if "bt collector" in r:
+            priority = 0
+        elif "cm collector" in r:
+            priority = 1
+        else:
+            priority = 2
+        return (priority, p["name"])
+
+    sorted_loaders = sorted(roles["Loader"], key=loader_sort_key)
+    sorted_collectors = sorted(roles["Collector"], key=collector_sort_key)
 
     st.markdown(f"### {flag} {label}")
 
@@ -507,15 +532,20 @@ def render_mc_site_section(site_id: str, site_data: Dict):
 
     with col2:
         render_role_column(
-            f"Loaders ({loader_count})", "#e9f7ef", roles["Loader"], is_other=False
+            f"Loaders ({loader_count})",
+            "#e9f7ef",
+            sorted_loaders,
+            is_other=False,
         )
 
     with col3:
-        # We treat collectors as the primary content, and any "Other" in an expander below
         render_role_column(
-            f"Collectors ({collector_count})", "#fef3c7", roles["Collector"], is_other=False
+            f"Collectors ({collector_count})",
+            "#fef3c7",
+            sorted_collectors,
+            is_other=False,
         )
-        # Optional extra expander for "Other" if present
+
         if other_count:
             st.markdown("")
             render_role_column("Other roles", "#f4e9ff", roles["Other"], is_other=True)
@@ -528,9 +558,6 @@ def render_mc_site_section(site_id: str, site_data: Dict):
 
 def main():
     st.set_page_config(page_title="Who’s on shift?", layout="wide")
-
-    # 🎯 STEP 3 — built-in auto-refresh to keep the UI fresh (every 2 minutes)
-    st_autorefresh(interval=120000, key="shift-autorefresh")
 
     # Soft background + minimal Streamlit chrome
     st.markdown(
@@ -562,7 +589,6 @@ def main():
         "<hr style='margin-top:0.1rem; margin-bottom:0.9rem; border: none; height: 2px; background-color: #6366f1;' />",
         unsafe_allow_html=True,
     )
-
     st.caption(
         f"Current time (UTC): {now_utc.strftime('%Y-%m-%d %H:%M:%S')}  |  Local zone label: {local_tz_label}"
     )
@@ -576,16 +602,6 @@ def main():
             f"{cfg['flag']} {cfg['label']}" for cfg in ACTIVE_SITES.values()
         ]
         site_choice = st.selectbox("Location", site_options, index=0)
-
-    site_labels = ["All locations"] + [
-        f"{cfg['flag']} {cfg['label']}" for cfg in ACTIVE_SITES.values()
-    ]
-
-    site_choice = st.radio(
-        "Location",
-        site_labels,
-        horizontal=True,
-    )
 
     with col_search:
         search_text = st.text_input(
@@ -601,14 +617,12 @@ def main():
 
     st.markdown("")
 
-    # 🎯 STEP 4 — Make sure errors don’t kill the app
+    # ----- Data load ----- #
     try:
-        # Expensive: ICS fetch + parsing
         all_sites = get_active_shifts(now_utc)
     except Exception as e:
-        st.error("Error loading data, retrying…")
-        # Optional: log the error somewhere if you have logging wired up
-        st.stop()
+        st.error(f"Error fetching or parsing schedule: {e}")
+        return
 
     if not all_sites:
         st.info("No one is currently on shift according to the schedule.")
@@ -633,7 +647,7 @@ def main():
                 )
             }
 
-    # Apply free text search (works on standard buckets)
+    # Apply free text search
     filtered_sites = apply_search_filter(all_sites, search_text)
 
     if not filtered_sites:
@@ -650,11 +664,9 @@ def main():
 
     with tab_mc:
         st.markdown("")
-        # OTNs at the top for MC
         render_otn_cards()
         st.markdown("")
 
-        # Regroup into FO / Loader / Collector buckets
         mc_sites = regroup_for_mc_view(filtered_sites)
         for site_id, site_data in mc_sites.items():
             render_mc_site_section(site_id, site_data)
